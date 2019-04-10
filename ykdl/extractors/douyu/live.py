@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import random
 
 from ykdl.util.html import get_content, add_header
 from ykdl.util.match import match1, matchall
@@ -109,7 +110,8 @@ class Douyutv(VideoExtractor):
 
         def get_live_info(rate=0):
             params['rate'] = rate
-            params['cdn'] = self.cdns[self.cnt % len(self.cdns)]
+            # params['cdn'] = self.cdns[self.cnt % len(self.cdns)]
+            params['cdn'] = self.cdns[random.randint(0, len(self.cdns) - 1)]
             data = urlencode(params)
             if not isinstance(data, bytes):
                 data = data.encode()
