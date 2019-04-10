@@ -119,6 +119,11 @@ class Douyutv(VideoExtractor):
                 return live_data['msg']
 
             live_data = live_data["data"]
+
+            for cdn in live_data['cdnsWithName']:
+                if not cdn['cdn']in Douyutv.cdns:
+                    Douyutv.cdns.append(cdn['cdn'])
+
             real_url = '{}/{}'.format(live_data['rtmp_url'], live_data['rtmp_live'])
             rate_2_profile = dict((rate['rate'], rate['name']) for rate in live_data['multirates'])
             video_profile = rate_2_profile[live_data['rate']]
@@ -148,6 +153,7 @@ class Douyutv(VideoExtractor):
         error_msg = get_live_info()
         assert len(info.stream_types), error_msg
         info.stream_types = sorted(info.stream_types, key=self.stream_ids.index)
+        # for c
         Douyutv.cnt += 1
         return info
 
