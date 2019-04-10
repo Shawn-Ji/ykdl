@@ -37,6 +37,9 @@ class Douyutv(VideoExtractor):
         u'流畅': 'SD'
      }
 
+    cnt = 0
+    cdns = ['ws-h5', 'tct-h5']
+
     def prepare(self):
         assert javascript_is_supported, "No JS Interpreter found, can't parse douyu live!"
 
@@ -104,6 +107,7 @@ class Douyutv(VideoExtractor):
 
         def get_live_info(rate=0):
             params['rate'] = rate
+            params['cdn'] = self.cdns[Douyutv.cnt % len(Douyutv.cdns)]
             data = urlencode(params)
             if not isinstance(data, bytes):
                 data = data.encode()
@@ -144,6 +148,7 @@ class Douyutv(VideoExtractor):
         error_msg = get_live_info()
         assert len(info.stream_types), error_msg
         info.stream_types = sorted(info.stream_types, key=self.stream_ids.index)
+        Douyutv.cnt += 1
         return info
 
     def prepare_list(self):
