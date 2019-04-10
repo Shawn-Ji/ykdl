@@ -37,8 +37,10 @@ class Douyutv(VideoExtractor):
         u'流畅': 'SD'
      }
 
-    cnt = 0
-    cdns = ['ws-h5', 'tct-h5']
+    def __init__(self):
+        super().__init__()
+        self.cnt = 0
+        self.cdns = ['ws-h5', 'tct-h5']
 
     def prepare(self):
         assert javascript_is_supported, "No JS Interpreter found, can't parse douyu live!"
@@ -107,7 +109,7 @@ class Douyutv(VideoExtractor):
 
         def get_live_info(rate=0):
             params['rate'] = rate
-            params['cdn'] = self.cdns[Douyutv.cnt % len(Douyutv.cdns)]
+            params['cdn'] = self.cdns[self.cnt % len(self.cdns)]
             data = urlencode(params)
             if not isinstance(data, bytes):
                 data = data.encode()
@@ -121,8 +123,8 @@ class Douyutv(VideoExtractor):
             live_data = live_data["data"]
 
             for cdn in live_data['cdnsWithName']:
-                if not cdn['cdn']in Douyutv.cdns:
-                    Douyutv.cdns.append(cdn['cdn'])
+                if not cdn['cdn']in self.cdns:
+                    self.cdns.append(cdn['cdn'])
 
             real_url = '{}/{}'.format(live_data['rtmp_url'], live_data['rtmp_live'])
             rate_2_profile = dict((rate['rate'], rate['name']) for rate in live_data['multirates'])
@@ -153,8 +155,7 @@ class Douyutv(VideoExtractor):
         error_msg = get_live_info()
         assert len(info.stream_types), error_msg
         info.stream_types = sorted(info.stream_types, key=self.stream_ids.index)
-        # for c
-        Douyutv.cnt += 1
+        self.cnt += 1
         return info
 
     def prepare_list(self):
