@@ -1,6 +1,11 @@
 Change Log for ykdl
 ===================
 
+1.6.3.1
+-------
+
+- douyu use different cdns @ShawnJi
+
 1.6.3
 -------
 
