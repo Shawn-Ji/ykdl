@@ -47,6 +47,7 @@ class Douyutv(VideoExtractor):
      }
 
     def __init__(self):
+        print(123123123)
         super().__init__()
         self.cnt = 0
         self.cdns = ['ws-h5', 'tct-h5']
