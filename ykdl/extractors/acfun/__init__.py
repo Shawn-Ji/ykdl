@@ -4,9 +4,9 @@
 import re
 
 def get_extractor(url):
-    if 'v.douyu' in url or 'vmobile.douyu' in url:
-        from . import video as s
+    if '/bangumi/' in url:
+        from . import bangumi as s
     else:
-        from . import live as s
+        from . import video as s
 
     return s.site, url

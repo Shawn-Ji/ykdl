@@ -15,12 +15,11 @@ class VideoExtractor():
         super().__init__()
         if compact_isstr(url) and url.startswith('http'):
             self.url = url
+            if self.list_only():
+                return self.parser_list(url)
         else:
             self.vid= url
 
-        # if info is returned by prepare, no need go extractor
-        # else go extractor.
-        # info is instance of VideoInfo
         info = self.prepare()
         return info
 
@@ -38,8 +37,13 @@ class VideoExtractor():
     def prepare(self):
         pass
 
-    def extractor(self):
+    def prepare_list(self):
         pass
 
-    def prepare_list(self):
+    def list_only(self):
+        """
+        this API is to check if only the list informations is included
+        if true, go to parser list mode
+        MUST override!!
+        """
         pass
