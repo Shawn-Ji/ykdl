@@ -56,7 +56,7 @@ class BiliLive(VideoExtractor):
                 'quality': q,
                 'otype': 'json'
             }
-            data = json.loads(get_content(api_url + urlencode(params)), headers={
+            data = json.loads(get_content(api_url + urlencode(params), headers={
                 'Accept': 'application/json text/plain, */*',
                 'Accept-Encoding': 'gzip, deflate, br',
                 'Accept-Language': 'zh-CN,zh;q=0.9',
@@ -65,8 +65,9 @@ class BiliLive(VideoExtractor):
                 'Origin': 'https://live.bilibili.com',
                 'Referer': 'https://live.bilibili.com',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.25 Safari/537.36 Core/1.70.3732.400 QQBrowser/10.5.3819.400'
-            })
+            }))
 
+            print(data)
             assert data['code'] == 0, data['msg']
 
             data = data['data']
