@@ -3,7 +3,6 @@
 
 from ykdl.util.html import get_content, add_header
 from ykdl.util.match import match1, matchall
-from ykdl.util.jsengine import JSEngine, javascript_is_supported
 from ykdl.extractor import VideoExtractor
 from ykdl.videoinfo import VideoInfo
 from ykdl.compact import urlencode
@@ -52,8 +51,6 @@ class Douyutv(VideoExtractor):
         self.cdns = ['ws-h5', 'tct-h5']
 
     def prepare(self):
-        assert javascript_is_supported, "No JS Interpreter found, can't parse douyu live!"
-
         info = VideoInfo(self.name, True)
         add_header("Referer", 'https://www.douyu.com')
 
