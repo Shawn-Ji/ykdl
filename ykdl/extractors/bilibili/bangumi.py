@@ -3,7 +3,7 @@
 
 from ykdl.util.html import get_location, get_content
 from ykdl.util.match import match1, matchall
-from ykdl.compact import compact_bytes, urlencode
+from ykdl.compact import urlencode
 
 import json
 
@@ -23,23 +23,32 @@ class BiliBan(BiliBase):
     def get_page_info(self):
         html = get_content(self.url)
         date = json.loads(match1(html, '__INITIAL_STATE__=({.+?});'))
-        title = date['h1Title']
+        title = date.get('h1Title') or match1(html, '<title>(.+?)_番剧_bilibili_哔哩哔哩<')
         vid = date['epInfo']['cid']
         mediaInfo = date['mediaInfo']
-        artist = mediaInfo['upInfo']['name']
-        self.seasonType = mediaInfo['ssType']
+        self.seasonType = mediaInfo.get('season_type') or mediaInfo.get('ssType')
+        upInfo = mediaInfo.get('upInfo')
+        artist = upInfo and upInfo.get('name')
 
         return vid, title, artist
 
     def get_api_url(self, qn):
-        params_str = 'appkey={}&cid={}&module=bangumi&player=1&qn={}&season_type={}'.format(APPKEY, self.vid, qn, self.seasonType)
+        params_str = urlencode([
+            ('appkey', APPKEY),
+            ('cid', self.vid),
+            ('module', 'bangumi'),
+            ('platform', 'html5'),
+            ('player', 1),
+            ('qn', qn),
+            ('season_type', self.seasonType)
+        ])
         return sign_api_url(api_url, params_str, SECRETKEY)
 
     def prepare_list(self):
         html = get_content(self.url)
         eplist = matchall(html, ['"epList":(\[.*?\])'])
         if eplist:
-            eplist = sum(map(matchall, eplist, [[',"id":(\d+),']] * len(eplist)), [])
+            eplist = sum(map(matchall, eplist, [['"(?:ep_)?id":(\d+),']] * len(eplist)), [])
             return ['https://www.bilibili.com/bangumi/play/ep{}'.format(eid) for eid in eplist]
 
 site = BiliBan()

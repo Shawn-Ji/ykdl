@@ -14,6 +14,7 @@ except(ImportError):
 
 from argparse import ArgumentParser
 import socket
+import ssl
 import json
 import types
 from multiprocessing import cpu_count
@@ -22,9 +23,8 @@ import logging
 logger = logging.getLogger("YKDL")
 
 from ykdl.common import url_to_module
-from ykdl.compact import ProxyHandler, build_opener, install_opener, compact_str, urlparse
-from ykdl.util import log
-from ykdl.util.html import default_proxy_handler
+from ykdl.compact import ProxyHandler, compact_str, urlparse, getproxies
+from ykdl.util.html import add_default_handler, install_default_handlers
 from ykdl.util.wrap import launch_player, launch_ffmpeg, launch_ffmpeg_download
 from ykdl.util.m3u8_wrap import load_m3u8
 from ykdl.util.download import save_urls
@@ -42,6 +42,7 @@ def arg_parser():
     parser.add_argument('-o', '--output-dir', default='.', help="Set the output directory for downloaded videos.")
     parser.add_argument('-O', '--output-name', default='', help="downloaded videos with the NAME you want")
     parser.add_argument('-p', '--player', help="Directly play the video with PLAYER like mpv")
+    parser.add_argument('-k', '--insecure', action='store_true', default=False, help="Allow insecure server connections when using SSL.")
     parser.add_argument('--proxy', type=str, default='system', help="set proxy HOST:PORT for http(s) transfer. default: use system proxy settings")
     parser.add_argument('-t', '--timeout', type=int, default=60, help="set socket timeout seconds, default 60s")
     parser.add_argument('--no-merge', action='store_true', default=False, help="do not merge video slides")
@@ -120,10 +121,9 @@ def handle_videoinfo(info, index=0):
     if info.extra['rangefetch']:
         info.extra['rangefetch']['down_rate'] = info.extra['rangefetch']['video_rate'][stream_id]
     if args.proxy != 'none':
-        proxy = 'http://' + args.proxy
-        info.extra['proxy'] = proxy
+        info.extra['proxy'] = args.proxy
         if info.extra['rangefetch']:
-            info.extra['rangefetch']['proxy'] = proxy
+            info.extra['rangefetch']['proxy'] = args.proxy
     player_args = info.extra
     player_args['title'] = info.title
     if args.player:
@@ -141,34 +141,34 @@ def main():
     if args.timeout:
         socket.setdefaulttimeout(args.timeout)
 
+    if args.insecure:
+        ssl._create_default_https_context = ssl._create_unverified_context
+
+    proxies = None
     if args.proxy == 'system':
-        proxy_handler = ProxyHandler()
-        args.proxy = os.environ.get('HTTP_PROXY', 'none')
-    elif args.proxy.upper().startswith('SOCKS'):
-        try:
-            import socks
-            from sockshandler import SocksiPyHandler
-        except ImportError:
-            logger.error('To use SOCKS proxy, please install PySocks first!')
-            raise
-        parsed_socks_proxy = urlparse(args.proxy)
-        sockstype = socks.PROXY_TYPES[parsed_socks_proxy.scheme.upper()]
-        rdns = True
-        proxy_handler = SocksiPyHandler(sockstype,
-                                        parsed_socks_proxy.hostname,
-                                        parsed_socks_proxy.port,
-                                        rdns,
-                                        parsed_socks_proxy.username,
-                                        parsed_socks_proxy.password)
-    else:
-        proxy_handler = ProxyHandler({
+        proxies = getproxies()
+        args.proxy = proxies.get('http') or proxies.get('https', 'none')
+    args.proxy = args.proxy.lower()
+    if not args.proxy.startswith(('http', 'socks', 'none')):
+        args.proxy = 'http://' + args.proxy
+
+    if args.proxy == 'none':
+        proxies = {}
+    elif args.proxy.startswith(('http', 'socks')):
+        if args.proxy.startswith(('https', 'socks')):
+            try:
+                import extproxy
+            except ImportError:
+                logger.error('Please install ExtProxy to use proxy: ' + args.proxy)
+                raise
+        proxies = {
             'http': args.proxy,
             'https': args.proxy
-        })
-    if not args.proxy == 'none':
-        opener = build_opener(proxy_handler)
-        install_opener(opener)
-        default_proxy_handler[:] = [proxy_handler]
+        }
+    proxy_handler = ProxyHandler(proxies)
+
+    add_default_handler(proxy_handler)
+    install_default_handlers()
 
     #mkdir and cd to output dir
     if not args.output_dir == '.':
@@ -186,7 +186,7 @@ def main():
         exit = 0
         for url in args.video_urls:
             try:
-                m,u = url_to_module(url)
+                m, u = url_to_module(url)
                 if args.playlist:
                     parser = m.parser_list
                 else:
@@ -196,10 +196,10 @@ def main():
                     ind = 0
                     for i in info:
                         if ind < args.start:
-                            ind+=1
+                            ind += 1
                             continue
                         handle_videoinfo(i, index=ind)
-                        ind+=1
+                        ind += 1
                 else:
                     handle_videoinfo(info)
             except AssertionError as e:
