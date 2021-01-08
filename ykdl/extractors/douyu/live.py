@@ -34,8 +34,9 @@ def get_random_name(l):
 class Douyutv(VideoExtractor):
     name = u'斗鱼直播 (DouyuTV)'
 
-    stream_ids = ['BD10M', 'BD8M', 'BD4M', 'BD', 'TD', 'HD', 'SD']
+    stream_ids = ['OG', 'BD10M', 'BD8M', 'BD4M', 'BD', 'TD', 'HD', 'SD']
     profile_2_id = {
+        u'原画': 'OG',
         u'蓝光10M': 'BD10M',
         u'蓝光8M': 'BD8M',
         u'蓝光4M': 'BD4M',
@@ -59,12 +60,11 @@ class Douyutv(VideoExtractor):
                                 'room_id\s*=\s*(\d+)',
                                 '"room_id.?":(\d+)',
                                 'data-onlineid=(\d+)')
-        title = match1(html, 'Title-headlineH2">([^<]+)<')
-        artist = match1(html, 'Title-anchorName" title="([^"]+)"')
 
+        title = match1(html, 'Title-head\w*">([^<]+)<')
+        artist = match1(html, 'Title-anchorName\w*" title="([^"]+)"')
         if not title or not artist:
-            html = get_content('https://open.douyucdn.cn/api/RoomApi/room/' + self.vid)
-            room_data = json.loads(html)
+            room_data = json.loads(get_content('https://open.douyucdn.cn/api/RoomApi/room/' + self.vid))
             if room_data['error'] == 0:
                 room_data = room_data['data']
                 title = room_data['room_name']
@@ -109,7 +109,7 @@ class Douyutv(VideoExtractor):
                 return
             info.stream_types.append(stream)
             info.streams[stream] = {
-                'container': 'flv',
+                'container': match1(live_data['rtmp_live'], '\.(\w+)\?'),
                 'video_profile': video_profile,
                 'src' : [real_url],
                 'size': float('inf')

@@ -14,6 +14,7 @@ from ykdl.compact import compact_tempfile
 from .html import fake_headers
 
 posix = os.name == 'posix'
+nt = os.name == 'nt'
 
 # The maximum length of cmd string
 if posix:
@@ -46,6 +47,8 @@ class PlayerHandle(object):
             self.play()
 
     def play(self):
+        if self.handle:
+            return
         try:
             for cmd in self.cmds:
                 self.handle = handle = subprocess.Popen(cmd, env=self.env)
@@ -63,9 +66,12 @@ class PlayerHandle(object):
 
 def launch_player(player, urls, ext, play=True, **args):
     if ' ' in player:
-        cmd = shlex.split(player, posix=posix)
-        if not posix:
-            cmd = [arg[1:-1] if arg[0] == arg[-1] == "'" else arg for arg in cmd]
+        lex = shlex.shlex(player, posix=nt or posix)
+        lex.whitespace_split = True
+        if nt:
+            lex.quotes = '"'
+            lex.escape = ''
+        cmd = list(lex)
     else:
         cmd = [player]
 
@@ -77,11 +83,10 @@ def launch_player(player, urls, ext, play=True, **args):
         if args['referer']:
             cmd += ['--referrer=' + args['referer']]
         if args['title']:
-            cmd += ['--force-media-title=' + encode_for_wrap(args['title'], 'ignore')]
+            cmd += ['--force-media-title=' + args['title']]
         if args['header']:
             cmd += ['--http-header-fields=' + args['header']]
 
-    urls = [encode_for_wrap(url) for url in urls]
     if args['rangefetch']:
         urls = ['http://127.0.0.1:8806/' + url for url in urls]
         cmds = split_cmd_urls(cmd, urls)
@@ -120,18 +125,8 @@ def split_cmd_urls(cmd, urls):
         cmds = [_cmd]
     return cmds
 
-def encode_for_wrap(string, errors='strict'):
-    sys_code = sys.getfilesystemencoding()
-    if isinstance(string, type(u'')):
-        if isinstance(string, str):
-            string = string.encode(sys_code, errors).decode(sys_code)
-        else:
-            string = string.encode(sys_code, errors)
-    # ignore str in py2, bytes in py3
-    return string
-
 def launch_ffmpeg(basename, ext, lenth):
-    print('Merging video %s using ffmpeg:' % basename)
+    print('Merging video %s using FFmpeg:' % basename)
     if ext == 'ts':
         outputfile = basename + '.mp4'
     else:
@@ -145,10 +140,10 @@ def launch_ffmpeg(basename, ext, lenth):
                 outputfile ]
         pipe_input = subprocess.Popen(cmd, stdin=subprocess.PIPE).stdin
 
-        # use pipe pass data need not to wait subprocess
+        # use pipe pass data does not need to wait subprocess
         bufsize = 1024 * 64
         for i in range(lenth):
-            inputfile = '%s_%d_.%s' % (basename, i, ext)
+            inputfile = '%s_%d.%s' % (basename, i, ext)
             with open(inputfile, 'rb') as fp:
                 data = fp.read(bufsize)
                 while data:
@@ -158,7 +153,7 @@ def launch_ffmpeg(basename, ext, lenth):
         # build input file
         inputfile = compact_tempfile(mode='w+t', suffix='.txt', dir='.', encoding='utf-8')
         for i in range(lenth):
-            inputfile.write("file '%s_%d_.%s'\n" % (basename, i, ext))
+            inputfile.write("file '%s_%d.%s'\n" % (basename, i, ext))
         inputfile.flush()
 
         cmd = [ 'ffmpeg',
@@ -179,16 +174,14 @@ def launch_ffmpeg(basename, ext, lenth):
             except:
                 pass
 
-def launch_ffmpeg_download(url, name, live):
+def launch_ffmpeg_download(url, name):
     print('Now downloading: %s' % name)
-    if live:
-        logger.warning('''
+    logger.warning('''
 =================================
   stop downloading by press 'q'
 =================================
 ''')
 
-    url = encode_for_wrap(url)
     cmd = [ 'ffmpeg',
             '-y', '-hide_banner',
             '-headers', ''.join('%s: %s\r\n' % x for x in fake_headers.items()),

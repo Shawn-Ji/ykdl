@@ -8,7 +8,6 @@ import datetime
 import random
 from ykdl.util.fs import legitimize
 from ykdl.util import log
-from ykdl.util.wrap import encode_for_wrap
 
 class VideoInfo():
     def __init__(self, site, live = False):
@@ -65,9 +64,13 @@ class VideoInfo():
     def build_file_name(self,stream_id):
         if not self.title:
             self.title = self.site + str(random.randint(1, 9999))
-        name_list = [self.title]
+        unique_suffixes = []
         if not stream_id == 'current':
-            name_list.append(stream_id)
+            unique_suffixes.append(stream_id)
         if self.live:
-            name_list.append(datetime.datetime.now().isoformat())
-        return encode_for_wrap(legitimize('_'.join(name_list)), 'ignore')
+            unique_suffixes.append(legitimize(datetime.datetime.now().isoformat()))
+        if unique_suffixes:
+            unique_suffix = '_'.join(unique_suffixes)
+            return '_'.join([legitimize(self.title, trim= 81 - len(unique_suffix)), unique_suffix])
+        else:
+            return legitimize(self.title)
