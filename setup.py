@@ -1,49 +1,53 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-from setuptools import setup
+#!/usr/bin/env python3
 
-try:
-    import wheel
-except:
-    pass
+from setuptools import setup, find_packages
+import os
+import re
 
-import os, codecs, platform
+
+def read_file(*paths):
+    with open(os.path.join(here, *paths), 'r', encoding='utf-8') as fp:
+        return fp.read()
+
+def get_version():
+    content = read_file('ykdl', 'version.py')
+    version_match = re.search('^__version__ = [\'"]([^\'"]+)', content, re.M)
+    if version_match:
+        return version_match.group(1)
+    raise RuntimeError('Unable to find version string.')
+
+# memo: pycryptodome is not being used now
+REQ = [
+    'm3u8>=1.0.0',
+    'jsengine>=1.0.5',
+    "colorama;os_name=='nt'",
+]
+EXT = {
+  'proxy': ['ExtProxy'],
+  'br': ['BrotliCFFI'],
+}
+EXT['net'] = sum(EXT.values(), [])
+EXT['js'] = ['quickjs']
+EXT['all'] = list(set(sum((EXT.values()), [])))
 
 here = os.path.abspath(os.path.dirname(__file__))
-README = codecs.open(os.path.join(here, 'README.rst'), encoding='utf8').read()
-CHANGES = codecs.open(os.path.join(here, 'CHANGELOG.rst'), encoding='utf8').read()
-
-def find_packages(*tops):
-    packages = []
-    for d in tops:
-        for root, dirs, files in os.walk(d, followlinks=True):
-            if '__init__.py' in files:
-                packages.append(root)
-    return packages
-
-from ykdl.version import __version__
-
-REQ = ['m3u8', 'pycryptodome', 'urllib3']
-EXT = {
-  'ext-proxy': ['ExtProxy'],
-  'js-engine': ['PyChakra>=2.2.0']
-}
-if os.name == 'nt':
-    EXT['ansi-escape'] = ['colorama']
+README = read_file('README.rst')
+CHANGES = read_file('CHANGELOG.rst')
 
 
 setup(
-    name = "ykdl",
-    version = __version__,
-    author = "Zhang Ning",
-    author_email = "zhangn1985@gmail.com",
-    url = "https://github.com/zhangn1985/ykdl",
-    license = "MIT",
-    description = "a video downloader written in Python",
+    name = 'ykdl',
+    version = get_version(),
+    author = 'Zhang Ning',
+    author_email = 'zhangn1985@gmail.com',
+    maintainer = 'SeaHOH',
+    maintainer_email = 'seahoh@gmail.com',
+    url = 'https://github.com/SeaHOH/ykdl',
+    license = 'MIT',
+    description = 'a video downloader written in Python',
     long_description = README + '\n\n' +  CHANGES,
-    keywords = "video download youku acfun bilibili",
-    packages = find_packages('ykdl', 'cykdl'),
-    requires = REQ,
+    keywords = 'video download youku acfun bilibili',
+    packages = find_packages(here),
     install_requires = REQ,
     extras_require = EXT,
     platforms = 'any',
@@ -51,29 +55,31 @@ setup(
     package_data = {
         'ykdl': ['extractors/*.js', 'extractors/*/*.js'],
     },
+    python_requires = '>=3.5',
 
     classifiers = [
-        "Development Status :: 4 - Beta",
-        "Environment :: Console",
-        "Intended Audience :: Developers",
-        "Intended Audience :: End Users/Desktop",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Topic :: Internet",
-        "Topic :: Internet :: WWW/HTTP",
-        "Topic :: Multimedia",
-        "Topic :: Multimedia :: Sound/Audio",
-        "Topic :: Multimedia :: Video",
-        "Topic :: Utilities"
+        'Development Status :: 4 - Beta',
+        'Environment :: Console',
+        'Intended Audience :: Developers',
+        'Intended Audience :: End Users/Desktop',
+        'License :: OSI Approved :: MIT License',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Topic :: Internet',
+        'Topic :: Internet :: WWW/HTTP',
+        'Topic :: Multimedia',
+        'Topic :: Multimedia :: Sound/Audio',
+        'Topic :: Multimedia :: Video',
+        'Topic :: Utilities'
     ],
-    entry_points={
-        "console_scripts": ["ykdl=cykdl.__main__:main"]
+    entry_points = {
+        'console_scripts': ['ykdl=cykdl.__main__:main']
     },
 )

@@ -1,20 +1,14 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from ykdl.util.html import get_content
-from ykdl.util.match import match1
-from ykdl.extractor import VideoExtractor
-from ykdl.videoinfo import VideoInfo
-from ykdl.util.jsengine import JSEngine
-
-assert JSEngine, "No JS Interpreter found, can't parse egame live!"
+from .._common import *
 
 
-class QQEGame(VideoExtractor):
-    name = u'QQ EGAME (企鹅电竟)'
+assert JSEngine, "No JS Interpreter found, can't extract egame live!"
 
-    stream_ids = ['BD10M', 'BD8M', 'BD6M', 'BD4M', 'BD', 'TD', 'HD', 'SD']
-    
+
+class QQEGame(Extractor):
+    name = 'QQ EGAME (企鹅电竟)'
+
     lv_2_id = {
         10: 'BD10M',
          8: 'BD8M',
@@ -26,7 +20,7 @@ class QQEGame(VideoExtractor):
     }
 
     def prepare(self):
-        info = VideoInfo(self.name, True)
+        info = MediaInfo(self.name, True)
         if not self.vid:
             self.vid = match1(self.url, '/(\d+)')
         if not self.url:
@@ -36,11 +30,11 @@ class QQEGame(VideoExtractor):
         js_nuxt = match1(html, '<script>window.__NUXT__=(.+?)</script>')
         js_ctx = JSEngine()
         data = js_ctx.eval(js_nuxt)
-        self.logger.debug('data => %s', data)
+        self.logger.debug('data:\n%s', data)
 
         state = data.get('state', {})
         error = data.get('error') or state.get('errors')
-        assert not error, 'error: {}!!'.format(error)
+        assert not error, 'error: {error}!!'.format(**vars())
 
         liveInfo = state['live-info']['liveInfo']
         videoInfo = liveInfo['videoInfo']
@@ -49,11 +43,10 @@ class QQEGame(VideoExtractor):
 
         title = videoInfo['title']
         info.artist = artist = profileInfo['nickName']
-        info.title = u'{} - {}'.format(title, artist)
+        info.title = '{title} - {artist}'.format(**vars())
 
         for s in videoInfo['streamInfos']:
             stream = self.lv_2_id[s['levelType']]
-            info.stream_types.append(stream)
             info.streams[stream] = {
                 'container': 'flv',
                 'video_profile': s['desc'],
@@ -61,7 +54,6 @@ class QQEGame(VideoExtractor):
                 'size': float('inf')
             }
 
-        info.stream_types = sorted(info.stream_types, key=self.stream_ids.index)
         return info
 
 

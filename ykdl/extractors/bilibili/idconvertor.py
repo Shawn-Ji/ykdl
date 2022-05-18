@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 '''Bilibili VID convertor, AV <=> BV.
 
 Origin by mcft:
@@ -5,6 +7,9 @@ Origin by mcft:
 
 Modified by SeaHOH
 '''
+
+
+__all__ = ['bv2av', 'av2bv']
 
 tablec = list('fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF')
 tablei = {c: i for i, c in enumerate(tablec)}

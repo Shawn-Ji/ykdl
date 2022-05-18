@@ -1,61 +1,64 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from ykdl.util.match import match1
-from ykdl.util.html import get_content
-from ykdl.extractor import VideoExtractor
-from ykdl.videoinfo import VideoInfo
-from ykdl.compact import urlencode, compact_bytes
+from .._common import *
 
-import json
 
-class DoubanMusic(VideoExtractor):
-    name = u'Douban Music (豆瓣音乐)'
+def get_info_list(sids):
+    data = get_response('https://music.douban.com/j/artist/playlist',
+                        data={
+                            'source' : '',
+                            'sids' : sids,
+                            'ck' : ''
+                        }).json()
 
-    song_info = {}
+    info = None
+    for song in data['songs']:
+        info = MediaInfo(site.name)
+        artist = song['artist']
+        info.title = song['title']
+        info.artist = artist['name']
+        info.duration = song['play_length']
+        info.add_comment(song['label'])
+        info.add_comment(artist['style'])
+        info.extra.referer = artist['url']
+        info.streams['current'] = {
+            'container': 'mp3',
+            'video_profile': 'current',
+            'src' : [song['url']],
+        }
+        yield info
+
+    assert info, "can't find songs of %r, may has been removed!" % sids
+
+class DoubanMusic(Extractor):
+    name = 'Douban Music (豆瓣音乐)'
 
     def prepare(self):
-        info = VideoInfo(self.name)
         if not self.vid:
-            self.vid = match1(self.url, 'sid=(\d+)')
+            self.vid = match1(self.url, 's(?:id)?=(\d+)')
+        assert self.vid, 'No sid has been found!'
 
-        params = {
-            "source" : "",
-            "sids" : self.vid,
-            "ck" : ""
-        }
-        form = urlencode(params)
-        data = json.loads(get_content('https://music.douban.com/j/artist/playlist', data = compact_bytes(form, 'utf-8')))
-        self.song_info = data['songs'][0]
-        self.extract_song(info)
-        return info
+        for info in get_info_list(self.vid):
+            return info
 
-    def extract_song(self, info):
-        song = self.song_info
-        info.title = song['title']
-        info.artist = song['artist_name']
-        info.stream_types.append('current')
-        info.streams['current'] = {'container': 'mp3', 'video_profile': 'current', 'src' : [song['url']], 'size': 0}
+    def list_only(self):
+        return 'site.douban' in self.url and not match(self.url, 's=\d+') or \
+                match(self.url, 'sid=\d+,\d')
 
-    def parser_list(self, url):
+    def prepare_list(self):
 
-        sids = match1(url, 'sid=([0-9,]+)')
+        if 'site.douban' in self.url:
+            sids = matchall(get_content(self.url), 'sid="(\d+)"')
+        else:
+            sids = matchall(match1(self.url, 'sid=([\d,]+)') or '', '(\d+)')
+        assert sids, 'No sid has been found!'
 
-        params = {
-            "source" : "",
-            "sids" : sids,
-            "ck" : ""
-        }
-        form = urlencode(params)
-        data = json.loads(get_content('https://music.douban.com/j/artist/playlist', data = compact_bytes(form, 'utf-8')))
-
-        info_list = []
-        for s in data['songs']:
-            info = VideoInfo(self.name)
-            self.song_info = s
-            self.extract_song(info)
-            info_list.append(info)
-        return info_list
+        sids, osids = [], sids
+        for sid in osids:
+            if sid not in sids:
+                sids.append(sid)
+        sids = ','.join(sids)
+        return get_info_list(sids)
 
 
 site = DoubanMusic()

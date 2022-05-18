@@ -1,17 +1,30 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from ..simpleextractor import SimpleExtractor
+from ._common import *
 
-import json
-import re
 
 class Ku6(SimpleExtractor):
-    name = u"酷6 (Ku6)"
+    name = '酷6 (Ku6)'
 
-    def __init__(self):
-        SimpleExtractor.__init__(self)
+    def init(self):
         self.url_pattern = 'flvURL: "([^"]+)'
         self.title_pattern = 'title = "([^"]+)'
+        pass
+
+    def list_only(self):
+        return match(self.url, 'https://www.ku6.com/detail/\d+')
+
+    def prepare_list(self):
+        html = get_content(self.url)
+        videos = matchall(html, "'title': '(.+?)',[\s\S]+?'playUrl': '(.+?)',")
+        videos.reverse()
+        for title, url in videos:
+            info = MediaInfo(self.name)
+            info.title = title
+            info.streams['current'] = {
+                'container': 'mp4',
+                'src': [url]
+            }
+            yield info
 
 site = Ku6()

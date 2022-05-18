@@ -1,47 +1,88 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import re
 
-def match1(text, *patterns):
-    """Scans through a string for substrings matched some patterns (first-subgroups only).
 
-    Args:
-        text: A string to be scanned.
-        patterns: Arbitrary number of regex patterns.
+__all__ = ['match', 'match1', 'matchm', 'matchall']
 
-    Returns:
-        When matches, returns first-subgroups from first match.
-        When no matches, return None
-    """
-
-    for pattern in patterns:
+def _format_str(pattern, string):
+    '''Format the target which will be scanned, makes the worker happy.'''
+    strtype = type(pattern)
+    if not isinstance(string, strtype):
         try:
-            match = re.search(pattern, text)
-        except(TypeError):
-            match = re.search(pattern, str(text))
-        if match:
-            return match.group(1)
+            string = strtype(string, 'utf-8')
+        except TypeError:
+            if isinstance(string, bytearray):
+                string = bytes(string)
+            else:
+                for n in ('getvalue', 'tobytes', 'read', 'encode', 'decode'):
+                    f = getattr(string, n, None)
+                    if f:
+                        try:
+                            string = f()
+                            break
+                        except:
+                            pass
+                if not isinstance(string, (str, bytes)):
+                    try:
+                        if isinstance(string, int):  # defense memory burst
+                            raise
+                        string = strtype(string)
+                    except:
+                        string = str(string)
+            if not isinstance(string, strtype):
+                string = strtype(string, 'utf-8')
+    return string
+
+def match(obj, *patterns):
+    '''Scans a object for matched some patterns with capture mode (matches first).
+
+    Params:
+        `obj`, any object which contains string data.
+        `patterns`, arbitrary number of regex patterns.
+
+    Returns the first Match object, or None.
+    '''
+    for pattern in patterns:
+        string = _format_str(pattern, obj)
+        m = re.search(pattern, string)
+        if m:
+            return m
     return None
 
+def match1(obj, *patterns):
+    '''Scans a object for matched some patterns with capture mode.
 
-def matchall(text, patterns):
-    """Scans through a string for substrings matched some patterns.
+    Params: same as match()
 
-    Args:
-        text: A string to be scanned.
-        patterns: a list of regex pattern.
+    Returns the first captured substring, or None.
+    '''
+    m = match(obj, *patterns)
+    return m and m.groups()[0]
 
-    Returns:
-        a list if matched. empty if not.
-    """
+def matchm(obj, *patterns):
+    '''Scans a object for matched some patterns with capture mode.
 
+    Params: same as match()
+
+    Returns all captured substrings of the first Match object, or same number of
+    None objects.
+    '''
+    m = match(obj, *patterns)
+    return m and m.groups() or (None,) * re.compile(patterns[0]).groups
+
+
+def matchall(obj, *patterns):
+    '''Scans a object for matched some patterns with capture mode.
+
+    Params: same as match()
+
+    Returns a list of all the captured substring of matches, or a empty list.
+    If a conformity form of captures in the list has be excepted, all the regex
+    patterns MUST include a similar capture mode.
+    '''
     ret = []
     for pattern in patterns:
-        try:
-            match = re.findall(pattern, text)
-        except(TypeError):
-            match = re.findall(pattern, str(text))
-        ret += match
+        string = _format_str(pattern, obj)
+        m = re.findall(pattern, string)
+        ret += m
 
     return ret

@@ -1,13 +1,6 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import base64
-import json
-
-from ykdl.videoinfo import VideoInfo
-from ykdl.extractor import VideoExtractor
-from ykdl.util.match import match1
-from ykdl.util.html import get_content
+from ._common import *
 
 
 def decodeencoded(encodestr):
@@ -40,18 +33,18 @@ def decodeencoded(encodestr):
     retstr = t7.decode()
     return retstr
 
-class JustFunLive(VideoExtractor):
-    name = u"抓饭直播 (JustFun Live)"
+class JustFunLive(Extractor):
+    name = '抓饭直播 (JustFun Live)'
 
     def prepare(self):
-        info = VideoInfo(self.name, True)
+        info = MediaInfo(self.name, True)
 
         if self.url and not self.vid:
             html = get_content(self.url)
 
-            title = match1(html, '<div class=\"play-title-inner\">([^<]+)</div>')
-            info.artist = artist =match1(html, 'data-director=\"([^\"]+)\"')
-            info.title = u'{} - {}'.format(title, artist)
+            title = match1(html, '<div class="play-title-inner">([^<]+)</div>')
+            info.artist = artist =match1(html, 'data-director="([^"]+)"')
+            info.title = '{title} - {artist}'.format(**vars())
 
             PL = match1(html, 'var PL = {([\s\S]+?)}')
             data = dict((k.strip(), json.loads(v)) for k, v in 
@@ -63,7 +56,6 @@ class JustFunLive(VideoExtractor):
             self.logger.debug('Decoded playInfo: %r', playInfo)
 
             # using only origin, as I have noticed - all links are same
-            info.stream_types.append('current')
             info.streams['current'] = {
                 'container': 'flv',
                 'video_profile': 'current',

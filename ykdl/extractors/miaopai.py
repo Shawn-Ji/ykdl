@@ -1,33 +1,20 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from ykdl.util.html import get_content, get_location, url_info, add_header
-from ykdl.util.match import match1, matchall
-from ykdl.extractor import VideoExtractor
-from ykdl.videoinfo import VideoInfo
+from ._common import *
 
-import json
-import random
+
+# BROKEN
 
 api_info1 = 'https://n.miaopai.com/api/aj_media/info.json?smid={}&appid=530&_cb={}'
 api_info2 = 'http://api.miaopai.com/m/v2_channel.json?fillType=259&scid={}&vend='
 api_stream = 'http://gslb.miaopai.com/stream/{}.json?vend='
 
+class Miaopai(Extractor):
 
-def get_random_str(l):
-    string = []
-    chars = list('abcdefghijklnmopqrstuvwxyz0123456789')
-    size = len(chars)
-    for i in range(l):
-        string.append(random.choice(chars))
-    return ''.join(string)
-
-class Miaopai(VideoExtractor):
-
-    name = u'秒拍 (Miaopai)'
+    name = '秒拍 (Miaopai)'
 
     def prepare(self):
-        info = VideoInfo(self.name)
+        info = MediaInfo(self.name)
         html = None
         title = None
 
@@ -42,7 +29,7 @@ class Miaopai(VideoExtractor):
         if not self.vid:
             html = get_content(self.url)
             self.vid = match1(html, 's[cm]id ?= ?[\'"]([^\'"]+)[\'"]')
-        assert self.vid, "No VID match!"
+        assert self.vid, 'No VID match!'
         info.title = self.name + '_' + self.vid
 
 
@@ -60,7 +47,7 @@ class Miaopai(VideoExtractor):
         
         else:
             try:
-                data = json.loads(get_content(api_info2.format(self.vid)))
+                data = get_response(api_info2.format(self.vid)).json()
                 assert data['status'] == 200, data['msg']
 
                 data = data['result']
@@ -69,10 +56,10 @@ class Miaopai(VideoExtractor):
                 ext = data['stream']['and']
                 base = data['stream']['base']
                 vend = data['stream']['vend']
-                url = '{}{}.{}?vend={}'.format(base, scid, ext, vend)
+                url = '{base}{scid}.{ext}?vend={vend}'.format(**vars())
             except:
                 # fallback
-                data = json.loads(get_content(api_stream.format(self.vid)))
+                data = get_response(api_stream.format(self.vid)).json()
                 assert data['status'] == 200, data['msg']
 
                 data = data['result'][0]
@@ -81,7 +68,7 @@ class Miaopai(VideoExtractor):
                 host = data['host']
                 path = data['path']
                 sign = data['sign']
-                url = '{}{}{}{}'.format(scheme, host, path, sign)
+                url = '{scheme}{host}{path}{sign}'.format(**vars())
 
         if not title:
             if not html:
@@ -90,7 +77,6 @@ class Miaopai(VideoExtractor):
         if title:
             info.title = title
 
-        info.stream_types.append('current')
         info.streams['current'] = {
             'container': ext or 'mp4',
             'src': [url],
@@ -101,6 +87,6 @@ class Miaopai(VideoExtractor):
     def prepare_list(self):
         html = get_content(self.url)
         video_list = match1(html, 'video_list=\[([^\]]+)')
-        return matchall(video_list, ['\"([^\",]+)'])
+        return matchall(video_list, '"([^",]+)')
 
 site = Miaopai()

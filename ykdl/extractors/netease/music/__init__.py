@@ -1,9 +1,9 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re
 
 def get_extractor(url):
+    add_header('Referer', 'http://music.163.com/')
+
     if '/program' in url:
         from . import program as s
     elif '/dj' in url:

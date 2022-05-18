@@ -1,39 +1,37 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 '''Processes/progress report hook arguments and report order:
 
   reporthook(action, size=None, total=None, part=None)
 
-  1. download start      (['start', single, status])
+    0. download init         (['init'])
 
-    2. part start        (['part'], part=part)
+      1. download start      (['start', single, status])
 
-      3. part progress   (['part'], filesize, totalsize, part)
+        2. part start        (['part'], part=part)
 
-    4. part end          (['part end', status, downloaded], filesize, totalsize, part)
+          3. part progress   (['part'], filesize, totalsize, part)
 
-  5. download end        (['end']) => (downloaded, filessize, totalsize, costtime)
+        4. part end          (['part end', status, downloaded], filesize, totalsize, part)
+
+      5. download end        (['end']) => (downloaded, filessize, totalsize, costtime)
 '''
 
-from __future__ import print_function
 import os
 import sys
 import time
-import queue
 import socket
-import select
 import threading
 from logging import getLogger
 from shutil import get_terminal_size
 from concurrent.futures import ThreadPoolExecutor
-from ykdl.compact import Request, urlopen
-from ykdl.util import log
-from .html import fake_headers_without_ae as fake_headers
+from urllib.request import Request, urlopen
+from http.client import IncompleteRead
+
+from .http import hit_conn_cache, clear_conn_cache, fake_headers
+from .human import *
 from .log import IS_ANSI_TERMINAL
 
 
-logger = getLogger('downloader')
+logger = getLogger(__name__)
 
 print_lock = threading.Lock()
 _max_columns = get_terminal_size().columns - 1
@@ -52,30 +50,8 @@ def set_rcvbuf(response):
     try:
         response.fp.raw._sock.setsockopt(
                 socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)  # 64KB
-    except Exception:
-        pass
-
-def human_size(n):
-    if n < 0:
-        return 'N/A'
-    for unit in ('B', 'KB', 'MB', 'GB'):
-        if unit != 'GB' and n >= 1024:
-            n /= 1024.0
-        else:
-            break
-    return ' '.join(['{:.3f}'.format(n).rstrip('0').rstrip('.'), unit])
-
-def format_time(t):
-    if t < 0:
-        return 'N/A'
-    if t < 60:
-        pt = 0, t
-    else:
-        pt = t,
-        for _ in range(2):
-            if pt[0] >= 60:
-                pt = divmod(pt[0], 60) + pt[1:]
-    return ':'.join('%02d' % t for t in pt)
+    except Exception as e:
+        logger.debug('error occurred during set_rcvbuf: %s', e)
 
 def get_progress_bar(percent):
     bar_fg = _progress_bar_fg * int(_progress_bar_len * percent / 100)
@@ -92,7 +68,7 @@ def multi_hook(action, size=None, total=None, part=None):
             if not force_refresh and ct - _processes_last_refresh < 0.1:
                 return
             _processes_last_refresh = ct
-            sys.stdout.write(_clear_enter)
+            sys.stderr.write(_clear_enter)
             if _processes_single:
                 if '%' in _progress:
                     Processes = _progress_bar + get_processes_suffix()
@@ -103,8 +79,9 @@ def multi_hook(action, size=None, total=None, part=None):
                 Processes += ' '.join(['P%d-%s' % p for p in _processes.items()])
                 if len(Processes) > _max_columns:
                     Processes = Processes[:_max_columns - 3] + '...'
-            sys.stdout.write(Processes)
-            sys.stdout.flush()
+            sys.stderr.write(Processes)
+            sys.stderr.write('\r')
+            sys.stderr.flush()
 
     def processes_deamon():
         nonlocal ct
@@ -119,7 +96,7 @@ def multi_hook(action, size=None, total=None, part=None):
         _processes_suffix = '  %%s [%d/%d] [%%s]' % (sum(status), len(status))
 
     def get_processes_suffix():
-        return _processes_suffix % (_progress, format_time(ct - _processes_start))
+        return _processes_suffix % (_progress, human_time(ct - _processes_start))
 
     def update_processes_prefix():
         global _processes_prefix
@@ -127,7 +104,7 @@ def multi_hook(action, size=None, total=None, part=None):
         _processes_prefix = 'Processes[%d/%d][%%s]: ' % (sum(status), len(status))
 
     def get_processes_prefix():
-        return _processes_prefix % format_time(ct - _processes_start)
+        return _processes_prefix % human_time(ct - _processes_start)
 
     ct = time.monotonic()
     action, *action_args = action
@@ -176,8 +153,13 @@ def multi_hook(action, size=None, total=None, part=None):
     elif action == 'print':
         args, kwargs = action_args
         with print_lock:
-            sys.stdout.write(_clear_enter)
+            sys.stderr.write(_clear_enter)
+            kwargs['file'] = sys.stderr
             print(*args, **kwargs)
+
+    elif action == 'init':
+        _processes_downloaded = {}
+        return
 
     elif action == 'start':
         _processes_single, *action_args = action_args
@@ -189,10 +171,6 @@ def multi_hook(action, size=None, total=None, part=None):
             update_processes_prefix()
         _processes_start = ct
         _processes_last_refresh = 0
-        try:
-            _processes_downloaded
-        except NameError:
-            _processes_downloaded = {}
         _processing = True
         threading._start_new_thread(processes_deamon, ())
 
@@ -202,7 +180,7 @@ def multi_hook(action, size=None, total=None, part=None):
         _processes_downloaded.update({k: (0, v[1], v[2])
                                      for k, v in _processes_downloaded.items()})
         cost = ct - _processes_start
-        return  downloaded, size, total, cost
+        return downloaded, size, total, cost
 
     print_processes(force_refresh)
 
@@ -211,15 +189,13 @@ def _save_url(url, name, ext, status, part=None, reporthook=multi_hook):
     def print(*args, **kwargs):
         reporthook(['print', args, kwargs])
 
-    def read_response(bs):
-        if size > 0:
-            # a independent timeout for read response
-            rd, _, ed = select.select([fd], [], [fd], timeout)
-            if ed:
-                raise socket.error(ed)
-            if not rd:
-                raise socket.timeout('The read operation timed out')
-        return response.read(bs)
+    def get_response(req):
+        response = urlopen(req, timeout=timeout_q)
+        try:
+            response.fp.raw._sock.settimeout(timeout_r)
+        except Exception as e:
+            logger.debug('error occurred during settimeout: %s', e)
+        return response
 
     if part is None:
         name = name + '.' + ext
@@ -232,15 +208,17 @@ def _save_url(url, name, ext, status, part=None, reporthook=multi_hook):
     downloaded = 0
     open_mode = 'wb'
     response = None
-    timeout = max(socket.getdefaulttimeout() or 0, 60)
+    timeout_q = min(socket.getdefaulttimeout() or 30, 30)
+    timeout_r = max(socket.getdefaulttimeout() or 0, 60)
     req = Request(url, headers=fake_headers)
+    req.remove_header('Accept-encoding')
     try:
         reporthook(['part'], part=part)
         if os.path.exists(name):
             filesize = os.path.getsize(name)
             if filesize:
                 req.add_header('Range', 'bytes=%d-' % (filesize-1))  # get +1, avoid 416
-                response = urlopen(req, None)
+                response = get_response(req)
                 set_rcvbuf(response)
                 if response.status == 206:
                     size = int(response.headers['Content-Range'].split('/')[-1])
@@ -262,21 +240,21 @@ def _save_url(url, name, ext, status, part=None, reporthook=multi_hook):
                     fd = response.fileno()
                     while needless_size > 0:
                         if needless_size > bs:
-                            block = read_response(bs)
+                            block = response.read(bs)
                         else:
-                            block = read_response(needless_size)
+                            block = response.read(needless_size)
                         if not block:
                             return
                         needless_size -= len(block)
         if response is None:
-            response = urlopen(req, None)
+            response = get_response(req)
             set_rcvbuf(response)
             fd = response.fileno()
         if size < 0:
             size = int(response.headers.get('Content-Length', -1))
         with open(name, open_mode) as tfp:
             while size < 0 or filesize < size:
-                block = read_response(bs)
+                block = response.read(bs)
                 if not block:
                     break
                 n = tfp.write(block)
@@ -302,20 +280,29 @@ def save_url(*args, tries=3, **kwargs):
         except IOError as e:
             if not tries or getattr(e, 'code', 0) >= 400:
                 raise e
+        except IncompleteRead:
+            pass
+        except KeyboardInterrupt:
+            print(file=sys.stderr)
+            raise
 
 def save_urls(urls, name, ext, jobs=1, fail_confirm=True,
               fail_retry_eta=3600, reporthook=multi_hook):
 
+    if not hit_conn_cache(urls[0]):
+        clear_conn_cache()  # clear useless caches
+
     def run(*args, **kwargs):
         fn, *args = args
-        futures = queue.deque()
+        futures = []
         for no, url in enumerate(urls):
             if status[no] == 1:
                 continue
-            futures.appendleft(
+            futures.append(
                 fn(*args, url, name, ext, status,
                    part=no, reporthook=reporthook, **kwargs))
             time.sleep(0.1)
+        futures.reverse()
         return futures
 
     count = len(urls)
@@ -328,23 +315,24 @@ def save_urls(urls, name, ext, jobs=1, fail_confirm=True,
             multi = True
         else:
             tries = 3
-    print('Start downloading: ' + name)
+    print('Start downloading: ' + name, file=sys.stderr)
+    reporthook(['init'])
     while tries:
         if count > 1 and os.path.exists(name + '.' + ext):
-            print('Skipped: files has already been downloaded')
+            print('Skipped: files has already been downloaded', file=sys.stderr)
             return True
         tries -= 1
         reporthook(['start', not multi, status])
         if count == 1:
             save_url(urls[0], name, ext, status, reporthook=reporthook)
         elif jobs > 1:
-            if count - sum(status) >= jobs > 12:
+            if min(count - sum(status), jobs) > 12:
                 logger.warning('number of active download processes is too big to works well!!')
             worker = ThreadPoolExecutor(max_workers=jobs)
-            futures = run(worker.submit, save_url)
             # does not call Thread.join(), catch KeyboardInterrupt in main thread
-            downloading = True
             try:
+                futures = run(worker.submit, save_url)
+                downloading = True
                 while downloading:
                     time.sleep(0.1)
                     for future in futures:
@@ -352,19 +340,21 @@ def save_urls(urls, name, ext, jobs=1, fail_confirm=True,
                         if downloading:
                             break
             except KeyboardInterrupt:
-                import atexit
-                from concurrent.futures.thread import _python_exit
-                atexit.unregister(_python_exit)
+                from concurrent.futures.thread import _threads_queues
+                from threading import _shutdown_locks
+                _threads_queues.clear()
+                _shutdown_locks.clear()
+                print(file=sys.stderr)
                 raise
-            worker.shutdown()
         else:
             run(save_url, tries=1)
         downloaded, size, total, _cost = reporthook(['end'])
         cost += _cost
         print('\nCurrent downloaded %s, cost %s.'
               '\nTotal downloaded %s of %s, cost %s'
-              % (human_size(downloaded), format_time(_cost),
-                 human_size(size), human_size(total), format_time(cost)))
+              % (human_size(downloaded), human_time(_cost),
+                 human_size(size), human_size(total), human_time(cost)),
+              file=sys.stderr)
         succeed = 0 not in status
         if not succeed:
             if count == 1:
@@ -384,10 +374,10 @@ def save_urls(urls, name, ext, jobs=1, fail_confirm=True,
                 not fail_confirm or
                 input('The estimated ETA is %s, '
                       'do you want to continue downloading? [Y] '
-                      % format_time(eta)
+                      % human_time(eta)
                 ).upper() != 'Y'):
             break
         if not tries:
             tries += 1
-        print('Restart downloading: ' + name)
+        print('Restart downloading: ' + name, file=sys.stderr)
     return succeed
