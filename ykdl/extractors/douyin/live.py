@@ -29,32 +29,36 @@ class TikTok(Extractor):
             video_info = data['initialState']['roomStore']['roomInfo'].get('room')
         except KeyError:
             video_info = data['/webcast/reflow/:id'].get('room')
-        assert video_info and video_info['status'] == 2, 'live is off!!!'
+        # assert video_info and video_info['status'] == 2, 'live is off!!!'
 
         title = video_info['title']
-        info.artist = nickName = video_info['owner']['nickname']
-        info.title = '{title} - {nickName}'.format(**vars())
+        try:
+            info.artist = nickName = video_info['owner']['nickname']
+            info.title = '{title} - {nickName}'.format(**vars())
 
-        stream_info = video_info['stream_url']
-        stream_urls = []
-        if 'flv_pull_url' in stream_info:
-            for ql, url in stream_info['flv_pull_url'].items():
-                stream_urls.append(['flv', ql, url])
-            stream_urls.append(['flv', 'ORIGIN', stream_info.get('rtmp_pull_url')])
-        if 'hls_pull_url_map' in stream_info:
-            for ql, url in stream_info['hls_pull_url_map'].items():
-                stream_urls.append(['m3u8', ql, url])
-            stream_urls.append(['m3u8', 'ORIGIN', stream_info.get('hls_pull_url')])
+            stream_info = video_info['stream_url']
+            stream_urls = []
+            if 'flv_pull_url' in stream_info:
+                for ql, url in stream_info['flv_pull_url'].items():
+                    stream_urls.append(['flv', ql, url])
+                stream_urls.append(['flv', 'ORIGIN', stream_info.get('rtmp_pull_url')])
+            if 'hls_pull_url_map' in stream_info:
+                for ql, url in stream_info['hls_pull_url_map'].items():
+                    stream_urls.append(['m3u8', ql, url])
+                stream_urls.append(['m3u8', 'ORIGIN', stream_info.get('hls_pull_url')])
 
-        for ext, ql, url in stream_urls:
-            if not url:
-                continue
-            video_profile, stream = self.quality_2_profile_id[ql]
-            info.streams[stream + '-' + ext[:3]] = {
-                'container': ext,
-                'video_profile': video_profile,
-                'src' : [url],
-            }
+            for ext, ql, url in stream_urls:
+                if not url:
+                    continue
+                video_profile, stream = self.quality_2_profile_id[ql]
+                info.streams[stream + '-' + ext[:3]] = {
+                    'container': ext,
+                    'video_profile': video_profile,
+                    'src' : [url],
+                }
+        except:
+            info.artist = re.search(r'<head><title data-react-helmet="true">(.*)的抖音直播间', html)[1]
+            info.streams = False
 
         return info
 
