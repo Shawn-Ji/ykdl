@@ -18,6 +18,7 @@ class TikTok(Extractor):
     def prepare(self):
         info = MediaInfo(self.name)
 
+        print('请求一次self.url')
         html = _byted.get_content(self.url)
         data = match1(html,
                      'id="RENDER_DATA" type="application/json">(.+?)</script>',
