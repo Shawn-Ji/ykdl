@@ -617,7 +617,7 @@ def get_response(url, headers={}, data=None, params=None, method='GET',
     req.responses = []
     if encoding == 'ignore':
         encoding = None
-    if cache and isinstance(data, (NoneType, bytes)):
+    if cache and isinstance(data, (NoneType, bytes)) and 'douyin.com' not in req.full_url:
         hits = _opener_open_cached.cache_info().hits
         response = _opener_open_cached(req, encoding)
         if _opener_open_cached.cache_info().hits - hits:
