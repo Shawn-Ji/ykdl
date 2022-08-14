@@ -26,7 +26,7 @@ class TikTok(Extractor):
         self.logger.debug('data: \n%s', data)
 
         try:
-            video_info = data['initialState']['roomStore']['roomInfo'].get('room')
+            video_info = data['app']['initialState']['roomStore']['roomInfo'].get('room')
         except KeyError:
             video_info = data['/webcast/reflow/:id'].get('room')
         # assert video_info and video_info['status'] == 2, 'live is off!!!'
