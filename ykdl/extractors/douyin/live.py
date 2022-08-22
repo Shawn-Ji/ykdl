@@ -36,7 +36,7 @@ class TikTok(Extractor):
             info.artist = nickName = video_info['owner']['nickname']
             info.title = '{title} - {nickName}'.format(**vars())
 
-            if video_info['live_room_mode'] != 1:
+            if video_info['live_room_mode'] == 2:
                 info.streams = False
             else:
                 stream_info = video_info['stream_url']
