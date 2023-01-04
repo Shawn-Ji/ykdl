@@ -22,7 +22,7 @@ class BiliBan(BiliBase):
         epInfo = data['epInfo']
         assert epInfo['epStatus'] != 13, "can't play VIP video!"
 
-        self.vid = epInfo['cid']
+        self.mid = epInfo['cid']
         mediaInfo = data['mediaInfo']
         self.seasonType = mediaInfo['ssType']
         ssTypeFormat = mediaInfo['ssTypeFormat']
@@ -54,16 +54,16 @@ class BiliBan(BiliBase):
         info.duration = epInfo['duration'] // 1000
 
     def get_api_url(self, qn):
-        params_str = urlencode([
-            ('appkey', APPKEY),
-            ('cid', self.vid),
-            ('module', 'bangumi'),
-            ('platform', 'html5'),
-            ('player', 1),
-            ('qn', qn),
-            ('season_type', self.seasonType)
-        ])
-        return sign_api_url(api_url, params_str, SECRETKEY)
+        params = {
+            'appkey': APPKEY,
+            'cid': self.mid,
+            'module': 'bangumi',
+            'platform': 'html5',
+            'player': 1,
+            'qn': qn,
+            'season_type': self.seasonType
+        }
+        return sign_api_url(api_url, params, SECRETKEY)
 
     def prepare_list(self):
         html = get_content(self.url)
@@ -72,13 +72,12 @@ class BiliBan(BiliBase):
         eplist = sum((s['epList'] for s in data['sections']), data['epList'])
         epids = [ep['id'] for ep in eplist if ep['epStatus'] != 13]
 
+        skiped = len(eplist) - len(epids)
+        if skiped:
+            self.logger.info('skiped %d VIP videos', skiped)
         assert epids, "can't play VIP videos!"
 
-        if epid and self.start < 0:
-            try:
-                self.start = epids.index(epid)
-            except ValueError:  # dropped VIP epid
-                pass
+        self.set_index(epid, epids)
         for id in epids:
             yield 'https://www.bilibili.com/bangumi/play/ep{id}'.format(**vars())
 

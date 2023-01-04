@@ -16,16 +16,16 @@ pattern_ext = r'''(?ix)
         mp4|webm                    | # video/audio
         f4v|flv|ts                  | # video
         mov|qt|m4[pv]|og[mv]        | # video
-        ogg|3gp|mpe?g               | # video/audio
+        ogg|vid|3gp|mpe?g           | # video/audio
         mp3|flac|wave?|oga|aac|weba   # audio
     )
-    /?(?:\?.+?)?
+    /?(?:[\?&].+?)?
 )["'#]
 '''
 pattern_src = r'''(?ix)
 <(?:video|audio|source)[^>]+?
-src=["']((?:https?:|\\?/)[^"']+)["']
-[^>]+?
+src=["']?((?:https?:|\\?/)[^"' ]+)["' ]
+[^>]*?
 (?:
     type=["']((?:video|audio|application)/[^"']+)["']
     |
@@ -43,6 +43,12 @@ class GeneralSimple(Extractor):
 
         info.title = match1(html, '<meta property="og:title" content="([^"]+)',
                                   '<title>(.+?)</title>')
+
+        streams = get_kt_playlist(html)
+        if streams:
+            info.streams = streams
+            info.extra.referer = self.url
+            return info
 
         ext = ctype = None
         for i in range(2):
@@ -63,6 +69,8 @@ class GeneralSimple(Extractor):
                 url = self.url[:self.url.find('/')] + url
             elif url[0] == '/':
                 url = self.url[:self.url.find('/', 9)] + url
+            if '?' not in url and '&' in url:
+                url = url.replace('&', '?', 1)
             if ext is None or ctype:
                 ctype = str(ctype).lower()
                 ext = contentTypes.get(ctype) or url_info(url)[1] or (
@@ -72,7 +80,7 @@ class GeneralSimple(Extractor):
             else:
                 info.streams['current'] = {
                     'container': ext,
-                    'video_profile': 'current',
+                    'profile': 'current',
                     'src': [url],
                     'size': 0
                 }

@@ -15,14 +15,16 @@ class BiliVideo(BiliBase):
     def get_page_info(self, info):
         page_index = match1(self.url, '\?p=(\d+)', 'index_(\d+)\.') or '1'
         html = get_content(self.url)
-        data = json.loads(match1(html, '__INITIAL_STATE__=({.+?});'))['videoData']
+        data = match1(html, '__INITIAL_STATE__=({.+?});')
+        self.logger.debug('data:\n%s', data)
+        data = json.loads(data)['videoData']
         title = data['title']
         pages = data['pages']
         for page in pages:
             index = str(page['page'])
             subtitle = page['part']
             if index == page_index:
-                self.vid = page['cid']
+                self.mid = page['cid']
                 if len(pages) > 1:
                     title = '{title} - {index} - {subtitle}'.format(**vars())
                 elif subtitle and subtitle != title:
@@ -34,14 +36,14 @@ class BiliVideo(BiliBase):
         info.add_comment(data['tname'])
 
     def get_api_url(self, qn):
-        params_str = urlencode([
-            ('appkey', APPKEY),
-            ('cid', self.vid),
-            ('platform', 'html5'),
-            ('player', 0),
-            ('qn', qn)
-        ])
-        return sign_api_url(api_url, params_str, SECRETKEY)
+        params = {
+            'appkey': APPKEY,
+            'cid': self.mid,
+            'platform': 'html5',
+            'player': 0,
+            'qn': qn
+        }
+        return sign_api_url(api_url, params, SECRETKEY)
 
     def prepare_list(self):
         vid = match1(self.url, '/(av\d+|(?:BV|bv)[0-9A-Za-z]{10})')
@@ -53,18 +55,17 @@ class BiliVideo(BiliBase):
             bvids = [episode['bvid'] for episode in
                         sum((section['episodes'] for section in
                             data['ugc_season']['sections']), [])]
-            if self.start < 0:
-                self.start = bvids.index(vid)
+            self.set_index(vid, bvids)
             for bvid in bvids:
-                yield 'https://www.bilibili.com/video/{bvid}'.format(**vars())
+                yield 'https://www.bilibili.com/video/{bvid}/'.format(**vars())
 
         else:
-            if self.start < 0:
-                page = int(match1(self.url, '[^a-z]p(?:age)?=(\d+)',
-                                            'index_(\d+)\.')
-                           or '1')
-                self.start = page - 1
-            for p in range(1, data['videos'] + 1):
-                yield 'https://www.bilibili.com/video/{vid}?p={p}'.format(**vars())
+            page = int(match1(self.url, '[^a-z]p(?:age)?=(\d+)',
+                                        'index_(\d+)\.')
+                       or '1')
+            self.set_index(page, data['videos'])
+            for p in range(data['videos']):
+                p = p + 1
+                yield 'https://www.bilibili.com/video/{vid}/?p={p}'.format(**vars())
 
 site = BiliVideo()

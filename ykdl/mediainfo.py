@@ -11,7 +11,7 @@ from .util import log
 from .util.fs import legitimize, compress_strip
 from .util.http import fake_headers
 from .util.human import human_size, _format_time, human_time, stream_index
-from .util.wrap import get_random_str
+from .util.wrap import get_random_str, hash
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class MediaInfo:
 
     @property
     def title(self):
-        return self._title
+        return self._title or '_'.join([self.site, hash.crc32(self.orig_url)])
 
     @title.setter
     def title(self, value):
@@ -82,15 +82,14 @@ class MediaInfo:
         stream = self.streams[stream_id]
         fmt, id = self.streams._split_id(stream_id)
         stream_fmt = id and self.streams[fmt] is stream and fmt
-        size = stream.get('size', 0) not in (0, float('inf')) and stream['size']
+        size = stream.get('size', 0) not in (0, Infinity) and stream['size']
         self.lprint(
         ['    - format:         {}', (stream_fmt and
                                       log.sprint(stream_fmt, log.NEGATIVE) + ' '
                                       or '')
                                    + log.sprint(stream_id, log.NEGATIVE)],
         ['      container:      {}', stream.get('container')],
-        ['      video-profile:  {}', stream.get('video_profile')],
-        ['      quality:        {}', stream.get('quality')],
+        ['      profile:        {}', stream.get('profile')],
         ['      size:           {} ({:d} Bytes)', size and human_size(size), size],
         ['    # download-with:  {}', stream_id != 'current' and
                 log.sprint('ykdl --format=%s [URL]' % stream_id, log.UNDERLINE)])
@@ -101,7 +100,7 @@ class MediaInfo:
         print('')
 
     def print_subtitle_info(self, subtitle, show_full=False):
-        size = subtitle.get('size', 0) not in (0, float('inf')) and subtitle['size']
+        size = subtitle.get('size', 0) not in (0, Infinity) and subtitle['size']
         self.lprint(
         ['    - language:       {}', log.sprint(subtitle['lang'], log.NEGATIVE)],
         ['      name:           {}', subtitle['name']],
@@ -125,13 +124,14 @@ class MediaInfo:
             'extra'         : self.extra,
         }
         for s in json_dict['streams']:
-            if json_dict['streams'][s].get('size') == float('inf'):
+            if json_dict['streams'][s].get('size') == Infinity:
                 json_dict['streams'][s].pop('size')
         return json_dict
 
     def print_info(self, stream_id=None, show_all=False, show_full=False):
         self.lprint(
         ['site:                 {}', self.site],
+        ['index:                {}', self.index and '{} / {}'.format(*self.index)],
         ['title:                {}', self.title],
         ['album:                {}', self.album],
         ['artist:               {}', self.artist],
@@ -150,18 +150,13 @@ class MediaInfo:
                 self.print_subtitle_info(subtitle, show_full)
 
     def build_file_name(self, stream_id):
-        unique_title = []
-        if self.title:
-            unique_title.append(self.title)
-            if self.album and self.album not in self.title:
-                unique_title.append(self.album)
-            if self.artist and self.artist not in self.title:
-                unique_title.append(self.artist)
-        else:
-            unique_title += [self.site, get_random_str(8)]
-        unique_title = [*legitimize('_'.join(unique_title))]
-        if not unique_title[-1]:
-            unique_title.pop()
+        title = self.title
+        unique_title = [title]
+        if self.album and self.album not in title:
+            unique_title.append(self.album)
+        if self.artist and self.artist not in title:
+            unique_title.append(self.artist)
+        unique_title = [legitimize('_'.join(unique_title))]
         if not stream_id == 'current':
             unique_title.append(stream_id)
         if self.live:
@@ -263,6 +258,8 @@ class MediaStreams:
             id = str(self._formats[fmt])
         if (fmt, id) in self._streams:
             raise KeyError(name)
+        value.setdefault('video_profile', value['profile'])
+        value.setdefault('size', 0)
         self._streamids.append((stream_index(fmt), fmt, id))
         self._streams[(fmt, id)] = value
         self._formats[fmt] += 1
