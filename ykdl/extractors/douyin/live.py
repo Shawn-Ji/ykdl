@@ -80,7 +80,10 @@ class Douyin(Extractor):
                         'size': Infinity
                     }
         except:
-            info.artist = re.search(r'<title data-react-helmet="true">(.*)的抖音直播间', html)[1]
+            try:
+                info.artist = re.search(r'<title data-react-helmet="true">(.*)的抖音直播间', html)[1]
+            except:
+                info.artist = False
             info.streams = False
 
         return info
