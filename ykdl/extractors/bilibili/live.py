@@ -45,7 +45,7 @@ class BiliLive(Extractor):
             mid = (mid, )
         wrid = fullmatch(mid[0], '\d+')
         assert wrid
-        return wrid, *mid[1:]
+        return [wrid, *mid[1:]]
 
     def prepare_mid(self):
         return match1(self.url, '/(\d+)')
