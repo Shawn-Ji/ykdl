@@ -17,6 +17,8 @@ class Douyin(Extractor):
 
     def prepare(self):
         info = MediaInfo(self.name)
+        t = re.findall(r'live.douyin.com/(.+)', self.url)
+        self.rid = t[0]
 
         if 'amemv.com' in self.url:
             data = get_response('https://webcast.amemv.com/webcast/room/reflow/info/',
@@ -35,12 +37,13 @@ class Douyin(Extractor):
             html = _byted.get_content(self.url)
             data = match1(html,
                          'id="RENDER_DATA" type="application/json">(.+?)</script>',
-                         '__INIT_PROPS__ = (.+?)</script>')
-            data = json.loads(unquote(data))
+                         '__INIT_PROPS__ = (.+?)</script>',
+                          r'push\(\[1,"c:\[\\"\$\\",\\"\$L13\\",null,(.+)]')
+            data = json.loads(unquote(data).replace('\\"', '"').replace('\\"', '"').replace(r'\n', '')[:-2])
             self.logger.debug('data: \n%s', data)
 
             try:
-                video_info = data['app']['initialState']['roomStore']['roomInfo'].get('room')
+                video_info = data['state']['roomStore']['roomInfo'].get('room')
             except KeyError:
                 video_info = data['/webcast/reflow/:id'].get('room')
 
@@ -82,7 +85,7 @@ class Douyin(Extractor):
         except:
             try:
                 # info.artist = re.search(r'<title>(.*)的抖音直播间', html)[1]
-                info.artist = data['app']['initialState']['roomStore']['roomInfo']['anchor']['nickname']
+                info.artist = data['state']['roomStore']['roomInfo']['anchor']['nickname']
             except:
                 info.artist = False
             info.streams = False
