@@ -1,4 +1,4 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__version__ = "1.8.3.douyin_artist"
+__version__ = "1.8.3.douyin230905"
