@@ -8,12 +8,12 @@ class Douyin(Extractor):
     name = '抖音直播 (Douyin)'
 
     quality_2_profile_id = {
-         'ORIGION': ['原画', 'OG'],
+        'ORIGION': ['原画', 'OG'],
         'FULL_HD1': ['蓝光', 'BD'],
-             'HD1': ['超清', 'TD'],
-             'SD1': ['高清', 'HD'],
-             'SD2': ['标清', 'SD']
-     }
+        'HD1': ['超清', 'TD'],
+        'SD1': ['高清', 'HD'],
+        'SD2': ['标清', 'SD']
+    }
 
     def prepare(self):
         info = MediaInfo(self.name)
@@ -24,22 +24,20 @@ class Douyin(Extractor):
             data = get_response('https://webcast.amemv.com/webcast/room/reflow/info/',
                                 params={
                                     'verifyFp': '',
-                                     'type_id': 0,
-                                     'live_id': 1,
-                                 'sec_user_id': '',
-                                      'app_id': 1128,
-                                     'msToken': '',
-                                     'X-Bogus': '',  # 1
-                                     'room_id': match1(self.url, '/reflow/(\d+)')
+                                    'type_id': 0,
+                                    'live_id': 1,
+                                    'sec_user_id': '',
+                                    'app_id': 1128,
+                                    'msToken': '',
+                                    'X-Bogus': '',  # 1
+                                    'room_id': match1(self.url, '/reflow/(\d+)')
                                 }).json()
             video_info = data['data'].get('room')
         else:
             html = _byted.get_content(self.url)
-            data = match1(html,
-                         'id="RENDER_DATA" type="application/json">(.+?)</script>',
-                         '__INIT_PROPS__ = (.+?)</script>',
-                          r'push\(\[1,"c:\[\\"\$\\",\\"\$L13\\",null,(.+)]')
-            data = json.loads(unquote(data).replace('\\"', '"').replace('\\"', '"').replace(r'\n', '')[:-2])
+            data = match1(html, r'self.__pace_f.push\(\[\d,("[a-z]:.+?")\]\)</script>')
+            data = json.loads(data)
+            data = json.loads(match1(data, r'(\[.+\])'))[-1]
             self.logger.debug('data: \n%s', data)
 
             try:
@@ -79,7 +77,7 @@ class Douyin(Extractor):
                     info.streams[stream_id + '-' + ext[:3]] = {
                         'container': ext,
                         'profile': stream_profile,
-                        'src' : [url],
+                        'src': [url],
                         'size': Infinity
                     }
         except:
@@ -91,5 +89,6 @@ class Douyin(Extractor):
             info.streams = False
 
         return info
+
 
 site = Douyin()
