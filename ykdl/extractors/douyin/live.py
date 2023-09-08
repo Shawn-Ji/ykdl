@@ -35,19 +35,19 @@ class Douyin(Extractor):
             video_info = data['data'].get('room')
         else:
             html = _byted.get_content(self.url)
-            data1 = match1(html, r'self.__pace_f.push\(\[\d,("[a-z]:.+?")\]\)</script>')
+            data1 = match1(html, 'self.__pace_f.push\(\[\d,("[a-z]:\[.+?,.+?,.+?,.+?")\]\)</script>')
             data2 = json.loads(data1)
-            data = json.loads(match1(data2, r'(\[.+\])'))[-1]
+            data = json.loads(match1(data2, '(\[.+\])'))[-1]
 
             try:
                 video_info = data['state']['roomStore']['roomInfo'].get('room')
             except Exception as e:
-                print('data1')
-                print(data1)
-                print('data2')
-                print(data2)
-                print('data')
-                print(data)
+                # print('data1')
+                # print(data1)
+                # print('data2')
+                # print(data2)
+                # print('data')
+                # print(data)
                 video_info = data['/webcast/reflow/:id'].get('room')
 
         # assert video_info and video_info['status'] == 2, 'live is off!!!'
