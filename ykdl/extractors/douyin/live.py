@@ -42,12 +42,12 @@ class Douyin(Extractor):
             try:
                 video_info = data['state']['roomStore']['roomInfo'].get('room')
             except Exception as e:
-                # print('data1')
-                # print(data1)
-                # print('data2')
-                # print(data2)
-                # print('data')
-                # print(data)
+                print('data1')
+                print(data1)
+                print('data2')
+                print(data2)
+                print('data')
+                print(data)
                 video_info = data['/webcast/reflow/:id'].get('room')
 
         # assert video_info and video_info['status'] == 2, 'live is off!!!'
