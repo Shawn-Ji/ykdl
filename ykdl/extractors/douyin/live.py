@@ -43,7 +43,7 @@ class Douyin(Extractor):
                 data2 = json.loads(data1)
                 data = json.loads(match1(data2, '(\[.+\])'))[-1]
                 video_info = data['state']['roomStore']['roomInfo'].get('room')
-            except Exception as e:
+            except BaseException as e:
                 print('data1')
                 print(data1)
                 print('data2')
