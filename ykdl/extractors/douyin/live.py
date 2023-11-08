@@ -39,7 +39,11 @@ class Douyin(Extractor):
             data2 = None
             data = None
             try:
-                data1 = match1(html, 'self.__pace_f.push\(\[\d,("[a-z]:\[.+?,.+?,.+?,.+?")\]\)</script>')
+                # data1 = match1(html, 'self.__pace_f.push\(\[\d,("[a-z]:\[.+?,.+?,.+?,.+?")\]\)</script>')
+                data1s = matchall(html, 'self.__pace_f.push\(\[\d,("[a-z]:\[.+?,.+?,.+?,.+?")\]\)</script>', 'self.__pace_f.push\(\[\d,("\d:\[.+?,.+?,.+?,.+?")\]\)</script>')
+                for data1 in data1s:
+                    if 'roomInfo\\":{}' not in data1:
+                        break
                 data2 = json.loads(data1)
                 data = json.loads(match1(data2, '(\[.+\])'))[-1]
                 video_info = data['state']['roomStore']['roomInfo'].get('room')
