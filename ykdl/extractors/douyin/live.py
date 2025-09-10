@@ -63,7 +63,7 @@ class Douyin(Extractor):
             info.artist = nickName = video_info['owner']['nickname']
             info.title = '{title} - {nickName}'.format(**vars())
 
-            if video_info['live_room_mode'] == 3:
+            if video_info['live_room_mode'] == 3 or video_info['live_room_mode'] == 2:
                 info.streams = False
             else:
                 stream_info = video_info['stream_url']
