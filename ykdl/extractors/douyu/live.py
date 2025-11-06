@@ -217,14 +217,13 @@ class Douyutv(Extractor):
                 return live_data['msg']
 
             live_data = live_data['data']
+            real_url = '/'.join([live_data['rtmp_url'], live_data['rtmp_live']])
 
             is_tct = live_data['rtmp_cdn'] == 'tct-h5'
             if live_data['rtmp_cdn'] != 'hs-h5':
                 fake_host, cname_url = build_hs_url('/'.join([live_data['rtmp_url'], live_data['rtmp_live']]), is_tct)
                 real_url = cname_url
 
-
-            # real_url = '/'.join([live_data['rtmp_url'], live_data['rtmp_live']])
             rate_2_profile = {rate['rate']: rate['name']
                               for rate in live_data['multirates']}
             stream_profile = rate_2_profile[live_data['rate']]
